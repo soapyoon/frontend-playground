@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type TouchEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Grid = number[][];
 
@@ -192,6 +192,7 @@ export default function Home() {
   const rickrollTimeoutRef = useRef<number | null>(null);
   const seenMergesRef = useRef<Set<number>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const [tiles, setTiles] = useState<Tile[]>(() => []);
   const [score, setScore] = useState(0);
@@ -204,6 +205,7 @@ export default function Home() {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [cheatEnabled, setCheatEnabled] = useState(false);
   const [cheatBuffer, setCheatBuffer] = useState("");
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   const canMove = useMemo(() => hasMoves(gridFromTiles(tiles)), [tiles]);
   const maxTile = useMemo(
@@ -234,6 +236,11 @@ export default function Home() {
     }, 90);
     return () => window.clearTimeout(timer);
   }, [tiles]);
+
+  useEffect(() => {
+    const coarse = window.matchMedia?.("(pointer: coarse)").matches;
+    setIsTouchDevice(coarse || "ontouchstart" in window);
+  }, []);
 
   useEffect(() => {
     const update = () => {
@@ -321,19 +328,9 @@ export default function Home() {
     }, MOVE_STEP_MS);
   };
 
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
+  const performMove = useCallback(
+    (direction: Direction) => {
       if (gameOver || isAnimating) return;
-      const map: Record<string, Direction> = {
-        ArrowLeft: "left",
-        ArrowRight: "right",
-        ArrowUp: "up",
-        ArrowDown: "down",
-      };
-      const direction = map[event.key];
-      if (!direction) return;
-
-      event.preventDefault();
       const { plan, moved } = planMove(tiles, direction, createId);
       if (!moved || !plan) return;
 
@@ -348,11 +345,51 @@ export default function Home() {
       );
       if (stepTimeoutRef.current) window.clearTimeout(stepTimeoutRef.current);
       stepTimeoutRef.current = window.setTimeout(runStep, 0);
+    },
+    [createId, gameOver, isAnimating, tiles]
+  );
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      const map: Record<string, Direction> = {
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        ArrowUp: "up",
+        ArrowDown: "down",
+      };
+      const direction = map[event.key];
+      if (!direction) return;
+      event.preventDefault();
+      performMove(direction);
     };
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [tiles, gameOver, isAnimating]);
+  }, [performMove]);
+
+  const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    if (!isTouchDevice || isAnimating) return;
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    if (!isTouchDevice || isAnimating) return;
+    const start = touchStartRef.current;
+    if (!start) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const threshold = 24;
+    if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      performMove(dx > 0 ? "right" : "left");
+    } else {
+      performMove(dy > 0 ? "down" : "up");
+    }
+    touchStartRef.current = null;
+  };
 
   const handleEnableSound = useCallback(() => {
     setSoundEnabled(true);
@@ -466,7 +503,14 @@ export default function Home() {
         </button>
       </div>
 
-      <div className="board" role="grid" aria-label="2048 board" ref={boardRef}>
+      <div
+        className="board"
+        role="grid"
+        aria-label="2048 board"
+        ref={boardRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <div className="grid" aria-hidden="true">
           {Array.from({ length: SIZE * SIZE }).map((_, index) => (
             <div className="cell" key={`bg-${index}`} />
