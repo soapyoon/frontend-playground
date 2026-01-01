@@ -335,7 +335,11 @@ export default function Home() {
         }
         if (cheatEnabled && mergedValues.includes(2048)) {
           if (rickrollTimeoutRef.current) window.clearTimeout(rickrollTimeoutRef.current);
-          rickrollTimeoutRef.current = window.setTimeout(() => setRickrollVisible(true), 1000);
+          if (isTouchDevice) {
+            setRickrollVisible(true);
+          } else {
+            rickrollTimeoutRef.current = window.setTimeout(() => setRickrollVisible(true), 1000);
+          }
         }
       }
 
@@ -426,14 +430,7 @@ export default function Home() {
     if (!rickrollAudioRef.current) {
       rickrollAudioRef.current = new Audio("/Voicy_Rickroll.mp3");
     }
-    rickrollAudioRef.current
-      .play()
-      .then(() => {
-        if (!rickrollAudioRef.current) return;
-        rickrollAudioRef.current.pause();
-        rickrollAudioRef.current.currentTime = 0;
-      })
-      .catch(() => {});
+    rickrollAudioRef.current.load();
   }, []);
 
   const triggerCheat = useCallback(() => {
