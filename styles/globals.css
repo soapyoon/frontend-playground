@@ -256,6 +256,21 @@ body {
   overflow: hidden;
 }
 
+.rickroll-mobile {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  background: #000;
+}
+
+.rickroll-mobile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .rickroll-start {
   width: 100%;
   height: 100%;

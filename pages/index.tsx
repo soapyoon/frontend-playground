@@ -192,6 +192,7 @@ export default function Home() {
   const rickrollTimeoutRef = useRef<number | null>(null);
   const seenMergesRef = useRef<Set<number>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rickrollAudioRef = useRef<HTMLAudioElement | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const [tiles, setTiles] = useState<Tile[]>(() => []);
@@ -255,6 +256,19 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!isTouchDevice) return;
+    if (!rickrollVisible) return;
+    if (!soundEnabled) return;
+    if (!rickrollAudioRef.current) {
+      rickrollAudioRef.current = new Audio("/Voicy_Rickroll.mp3");
+      rickrollAudioRef.current.loop = true;
+    }
+    rickrollAudioRef.current.currentTime = 0;
+    rickrollAudioRef.current.volume = 1;
+    rickrollAudioRef.current.play().catch(() => {});
+  }, [isTouchDevice, rickrollVisible, soundEnabled]);
+
+  useEffect(() => {
     return () => {
       if (stepTimeoutRef.current) window.clearTimeout(stepTimeoutRef.current);
       if (popupTimeoutRef.current) window.clearTimeout(popupTimeoutRef.current);
@@ -263,6 +277,11 @@ export default function Home() {
         audioRef.current.pause();
         audioRef.current.src = "";
         audioRef.current.load();
+      }
+      if (rickrollAudioRef.current) {
+        rickrollAudioRef.current.pause();
+        rickrollAudioRef.current.src = "";
+        rickrollAudioRef.current.load();
       }
     };
   }, []);
@@ -404,6 +423,17 @@ export default function Home() {
         audioRef.current.currentTime = 0;
       })
       .catch(() => {});
+    if (!rickrollAudioRef.current) {
+      rickrollAudioRef.current = new Audio("/Voicy_Rickroll.mp3");
+    }
+    rickrollAudioRef.current
+      .play()
+      .then(() => {
+        if (!rickrollAudioRef.current) return;
+        rickrollAudioRef.current.pause();
+        rickrollAudioRef.current.currentTime = 0;
+      })
+      .catch(() => {});
   }, []);
 
   const triggerCheat = useCallback(() => {
@@ -449,6 +479,10 @@ export default function Home() {
     setRickrollVisible(false);
     setCheatEnabled(false);
     seenMergesRef.current = new Set();
+    if (rickrollAudioRef.current) {
+      rickrollAudioRef.current.pause();
+      rickrollAudioRef.current.currentTime = 0;
+    }
     if (soundEnabled) {
       if (!audioRef.current) {
         audioRef.current = new Audio("/Voicy_Bruh.mp3");
@@ -560,7 +594,19 @@ export default function Home() {
       {rickrollVisible && (
         <div className="rickroll" role="dialog" aria-label="Rickroll">
           <div className="rickroll-inner">
-            {soundEnabled ? (
+            {isTouchDevice ? (
+              <div className="rickroll-mobile">
+                <img src="/rick-astley.png" alt="Rick Astley" />
+                {!soundEnabled && (
+                  <div className="rickroll-start">
+                    <p>Enable sound to play</p>
+                    <button className="reset" type="button" onClick={handleEnableSound}>
+                      Enable Sound
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : soundEnabled ? (
               <iframe
                 src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0&playsinline=1"
                 title="Rickroll"
@@ -568,7 +614,7 @@ export default function Home() {
                 allowFullScreen
               />
             ) : (
-              <div className="rickroll-start">s
+              <div className="rickroll-start">
                 <p>Enable sound to play</p>
                 <button className="reset" type="button" onClick={handleEnableSound}>
                   Enable Sound
@@ -580,6 +626,10 @@ export default function Home() {
               type="button"
               onClick={() => {
                 setRickrollVisible(false);
+                if (rickrollAudioRef.current) {
+                  rickrollAudioRef.current.pause();
+                  rickrollAudioRef.current.currentTime = 0;
+                }
               }}
             >
               Close
