@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Grid = number[][];
 
@@ -184,14 +184,14 @@ const planMove = (
 
 export default function Home() {
   const idRef = useRef(1);
-  const createId = () => idRef.current++;
+  const createId = useCallback(() => idRef.current++, []);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const moveRef = useRef<MovePlan | null>(null);
   const stepTimeoutRef = useRef<number | null>(null);
   const popupTimeoutRef = useRef<number | null>(null);
   const rickrollTimeoutRef = useRef<number | null>(null);
   const seenMergesRef = useRef<Set<number>>(new Set());
-  const rickrollShownRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [tiles, setTiles] = useState<Tile[]>(() => []);
   const [score, setScore] = useState(0);
@@ -201,6 +201,9 @@ export default function Home() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [popupValue, setPopupValue] = useState<number | null>(null);
   const [rickrollVisible, setRickrollVisible] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [cheatEnabled, setCheatEnabled] = useState(false);
+  const [cheatBuffer, setCheatBuffer] = useState("");
 
   const canMove = useMemo(() => hasMoves(gridFromTiles(tiles)), [tiles]);
   const maxTile = useMemo(
@@ -249,6 +252,11 @@ export default function Home() {
       if (stepTimeoutRef.current) window.clearTimeout(stepTimeoutRef.current);
       if (popupTimeoutRef.current) window.clearTimeout(popupTimeoutRef.current);
       if (rickrollTimeoutRef.current) window.clearTimeout(rickrollTimeoutRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+        audioRef.current.load();
+      }
     };
   }, []);
 
@@ -288,11 +296,18 @@ export default function Home() {
           newValues.forEach((value) => seenMergesRef.current.add(value));
           setPopupValue(highlight);
           if (popupTimeoutRef.current) window.clearTimeout(popupTimeoutRef.current);
-          popupTimeoutRef.current = window.setTimeout(() => setPopupValue(null), 500);
+          popupTimeoutRef.current = window.setTimeout(() => setPopupValue(null), 1050);
         }
-
-        if (mergedValues.includes(2048) && !rickrollShownRef.current) {
-          rickrollShownRef.current = true;
+        if (soundEnabled && newValues.length > 0) {
+          if (!audioRef.current) {
+            audioRef.current = new Audio("/Voicy_Bruh.mp3");
+          }
+          const audio = audioRef.current;
+          audio.currentTime = 0;
+          audio.volume = 1;
+          audio.play().catch(() => {});
+        }
+        if (cheatEnabled && mergedValues.includes(2048)) {
           if (rickrollTimeoutRef.current) window.clearTimeout(rickrollTimeoutRef.current);
           rickrollTimeoutRef.current = window.setTimeout(() => setRickrollVisible(true), 1000);
         }
@@ -339,6 +354,49 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [tiles, gameOver, isAnimating]);
 
+  const handleEnableSound = useCallback(() => {
+    setSoundEnabled(true);
+    if (!audioRef.current) {
+      audioRef.current = new Audio("/Voicy_Bruh.mp3");
+    }
+    audioRef.current
+      .play()
+      .then(() => {
+        if (!audioRef.current) return;
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      })
+      .catch(() => {});
+  }, []);
+
+  const triggerCheat = useCallback(() => {
+    setTiles([
+      { id: createId(), value: 1024, row: 0, col: 0, isNew: true },
+      { id: createId(), value: 1024, row: 0, col: 1, isNew: true },
+    ]);
+    setScore(0);
+    setGameOver(false);
+    setIsAnimating(false);
+    moveRef.current = null;
+    setCheatEnabled(true);
+  }, [createId]);
+
+  useEffect(() => {
+    const cheat = "1024";
+    const handleCheat = (event: KeyboardEvent) => {
+      if (event.key.length !== 1) return;
+      const next = (cheatBuffer + event.key).slice(-cheat.length);
+      setCheatBuffer(next);
+      if (next !== cheat) return;
+
+      triggerCheat();
+      setCheatBuffer("");
+    };
+
+    window.addEventListener("keydown", handleCheat);
+    return () => window.removeEventListener("keydown", handleCheat);
+  }, [cheatBuffer, triggerCheat]);
+
   const handleRestart = () => {
     let next = addRandomTile([], createId);
     next = addRandomTile(next, createId);
@@ -352,8 +410,21 @@ export default function Home() {
     if (rickrollTimeoutRef.current) window.clearTimeout(rickrollTimeoutRef.current);
     setPopupValue(null);
     setRickrollVisible(false);
+    setCheatEnabled(false);
     seenMergesRef.current = new Set();
-    rickrollShownRef.current = false;
+    if (soundEnabled) {
+      if (!audioRef.current) {
+        audioRef.current = new Audio("/Voicy_Bruh.mp3");
+      }
+      audioRef.current
+        .play()
+        .then(() => {
+          if (!audioRef.current) return;
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        })
+        .catch(() => {});
+    }
   };
 
   return (
@@ -381,6 +452,17 @@ export default function Home() {
         </div>
         <button className="reset" onClick={handleRestart} type="button">
           New Game
+        </button>
+        <button className="reset reset--cheat" onClick={triggerCheat} type="button">
+          Cheat 1024 (don’t press it unless you want to win normally)
+        </button>
+        <button
+          className="reset"
+          onClick={handleEnableSound}
+          type="button"
+          disabled={soundEnabled}
+        >
+          {soundEnabled ? "Sound Enabled" : "Enable Sound (recommended)"}
         </button>
       </div>
 
@@ -434,16 +516,27 @@ export default function Home() {
       {rickrollVisible && (
         <div className="rickroll" role="dialog" aria-label="Rickroll">
           <div className="rickroll-inner">
-            <iframe
-              src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1"
-              title="Rickroll"
-              allow="autoplay; encrypted-media"
-              allowFullScreen
-            />
+            {soundEnabled ? (
+              <iframe
+                src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0"
+                title="Rickroll"
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+              />
+            ) : (
+              <div className="rickroll-start">s
+                <p>Enable sound to play</p>
+                <button className="reset" type="button" onClick={handleEnableSound}>
+                  Enable Sound
+                </button>
+              </div>
+            )}
             <button
               className="rickroll-close"
               type="button"
-              onClick={() => setRickrollVisible(false)}
+              onClick={() => {
+                setRickrollVisible(false);
+              }}
             >
               Close
             </button>
@@ -453,7 +546,7 @@ export default function Home() {
 
       {gameOver && (
         <div className="gameover">
-          <p>Game over!</p>
+          <p> Bruh </p>
           <button className="reset" onClick={handleRestart} type="button">
             Try Again
           </button>
