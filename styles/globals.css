@@ -83,6 +83,8 @@ body {
   border-radius: 12px;
   padding: var(--pad);
   position: relative;
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .grid {
@@ -299,5 +301,28 @@ body {
 
   .tile-inner {
     font-size: 1.1rem;
+  }
+
+  .page {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .panel {
+    width: min(360px, 92vw);
+    gap: 8px;
+  }
+
+  .board {
+    width: min(360px, 92vw);
+  }
+
+  .score,
+  .progress-value {
+    font-size: 0.95rem;
+  }
+
+  .reset {
+    padding: 6px 10px;
   }
 }
