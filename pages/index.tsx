@@ -562,9 +562,9 @@ export default function Home() {
           <div className="rickroll-inner">
             {soundEnabled ? (
               <iframe
-                src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0"
+                src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=0&playsinline=1"
                 title="Rickroll"
-                allow="autoplay; encrypted-media"
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                 allowFullScreen
               />
             ) : (
