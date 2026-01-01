@@ -27,6 +27,20 @@ const GAP = 8;
 const PAD = 12;
 const MOVE_STEP_MS = 90;
 
+const TILE_IMAGES: Record<number, string> = {
+  2: "/tiles/2.webp",
+  4: "/tiles/4.jpg",
+  8: "/tiles/8.jpg",
+  16: "/tiles/16.webp",
+  32: "/tiles/32.jpeg",
+  64: "/tiles/64.jpeg",
+  128: "/tiles/128.jpg",
+  256: "/tiles/256.jpg",
+  512: "/tiles/512.jpeg",
+  1024: "/tiles/1024.png",
+  2048: "/tiles/2048.jpg",
+};
+
 const createEmptyGrid = (): Grid =>
   Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => 0));
 
@@ -174,6 +188,10 @@ export default function Home() {
   const boardRef = useRef<HTMLDivElement | null>(null);
   const moveRef = useRef<MovePlan | null>(null);
   const stepTimeoutRef = useRef<number | null>(null);
+  const popupTimeoutRef = useRef<number | null>(null);
+  const rickrollTimeoutRef = useRef<number | null>(null);
+  const seenMergesRef = useRef<Set<number>>(new Set());
+  const rickrollShownRef = useRef(false);
 
   const [tiles, setTiles] = useState<Tile[]>(() => []);
   const [score, setScore] = useState(0);
@@ -181,8 +199,14 @@ export default function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [cellSize, setCellSize] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [popupValue, setPopupValue] = useState<number | null>(null);
+  const [rickrollVisible, setRickrollVisible] = useState(false);
 
   const canMove = useMemo(() => hasMoves(gridFromTiles(tiles)), [tiles]);
+  const maxTile = useMemo(
+    () => tiles.reduce((value, tile) => Math.max(value, tile.value), 0),
+    [tiles]
+  );
 
   useEffect(() => {
     if (!canMove) setGameOver(true);
@@ -223,6 +247,8 @@ export default function Home() {
   useEffect(() => {
     return () => {
       if (stepTimeoutRef.current) window.clearTimeout(stepTimeoutRef.current);
+      if (popupTimeoutRef.current) window.clearTimeout(popupTimeoutRef.current);
+      if (rickrollTimeoutRef.current) window.clearTimeout(rickrollTimeoutRef.current);
     };
   }, []);
 
@@ -251,6 +277,27 @@ export default function Home() {
     }
 
     stepTimeoutRef.current = window.setTimeout(() => {
+      const mergedValues = active.finalTiles
+        .filter((tile) => tile.merged)
+        .map((tile) => tile.value);
+
+      if (mergedValues.length > 0) {
+        const newValues = mergedValues.filter((value) => !seenMergesRef.current.has(value));
+        if (newValues.length > 0) {
+          const highlight = Math.max(...newValues);
+          newValues.forEach((value) => seenMergesRef.current.add(value));
+          setPopupValue(highlight);
+          if (popupTimeoutRef.current) window.clearTimeout(popupTimeoutRef.current);
+          popupTimeoutRef.current = window.setTimeout(() => setPopupValue(null), 500);
+        }
+
+        if (mergedValues.includes(2048) && !rickrollShownRef.current) {
+          rickrollShownRef.current = true;
+          if (rickrollTimeoutRef.current) window.clearTimeout(rickrollTimeoutRef.current);
+          rickrollTimeoutRef.current = window.setTimeout(() => setRickrollVisible(true), 1000);
+        }
+      }
+
       const withTile = addRandomTile(active.finalTiles, createId);
       setTiles(withTile);
       setScore((prev) => prev + active.score);
@@ -301,6 +348,12 @@ export default function Home() {
     setIsAnimating(false);
     moveRef.current = null;
     if (stepTimeoutRef.current) window.clearTimeout(stepTimeoutRef.current);
+    if (popupTimeoutRef.current) window.clearTimeout(popupTimeoutRef.current);
+    if (rickrollTimeoutRef.current) window.clearTimeout(rickrollTimeoutRef.current);
+    setPopupValue(null);
+    setRickrollVisible(false);
+    seenMergesRef.current = new Set();
+    rickrollShownRef.current = false;
   };
 
   return (
@@ -313,6 +366,18 @@ export default function Home() {
         <div className="score">
           <span className="label">Score</span>
           <span className="value">{score}</span>
+        </div>
+        <div className="progress">
+          <span className="label">Highest Tile</span>
+          <div className="progress-value">
+            <div
+              className="progress-image"
+              style={{
+                backgroundImage: TILE_IMAGES[maxTile] ? `url(${TILE_IMAGES[maxTile]})` : "none",
+              }}
+            />
+            <span>{maxTile || 0}</span>
+          </div>
         </div>
         <button className="reset" onClick={handleRestart} type="button">
           New Game
@@ -342,13 +407,49 @@ export default function Home() {
                 className={`tile-inner ${
                   tile.merged ? "tile-inner--merge" : tile.isNew ? "tile-inner--new" : ""
                 }`}
+                style={{
+                  backgroundImage: TILE_IMAGES[tile.value]
+                    ? `url(${TILE_IMAGES[tile.value]})`
+                    : "none",
+                }}
               >
-                {tile.value}
+                <span className="sr-only">{tile.value}</span>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {popupValue !== null && (
+        <div className="merge-overlay" aria-hidden="true">
+          <div
+            className="merge-image"
+            style={{
+              backgroundImage: TILE_IMAGES[popupValue] ? `url(${TILE_IMAGES[popupValue]})` : "none",
+            }}
+          />
+        </div>
+      )}
+
+      {rickrollVisible && (
+        <div className="rickroll" role="dialog" aria-label="Rickroll">
+          <div className="rickroll-inner">
+            <iframe
+              src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1"
+              title="Rickroll"
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+            />
+            <button
+              className="rickroll-close"
+              type="button"
+              onClick={() => setRickrollVisible(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {gameOver && (
         <div className="gameover">
