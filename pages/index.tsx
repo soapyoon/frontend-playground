@@ -190,6 +190,7 @@ export default function Home() {
   const stepTimeoutRef = useRef<number | null>(null);
   const popupTimeoutRef = useRef<number | null>(null);
   const rickrollTimeoutRef = useRef<number | null>(null);
+  const rickrollImageTimeoutRef = useRef<number | null>(null);
   const seenMergesRef = useRef<Set<number>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rickrollAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -203,6 +204,7 @@ export default function Home() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [popupValue, setPopupValue] = useState<number | null>(null);
   const [rickrollVisible, setRickrollVisible] = useState(false);
+  const [rickrollImageVisible, setRickrollImageVisible] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [cheatEnabled, setCheatEnabled] = useState(false);
   const [cheatBuffer, setCheatBuffer] = useState("");
@@ -266,6 +268,12 @@ export default function Home() {
     rickrollAudioRef.current.currentTime = 0;
     rickrollAudioRef.current.volume = 1;
     rickrollAudioRef.current.play().catch(() => {});
+    if (rickrollImageTimeoutRef.current) window.clearTimeout(rickrollImageTimeoutRef.current);
+    setRickrollImageVisible(false);
+    rickrollImageTimeoutRef.current = window.setTimeout(
+      () => setRickrollImageVisible(true),
+      700
+    );
   }, [isTouchDevice, rickrollVisible, soundEnabled]);
 
   useEffect(() => {
@@ -273,6 +281,7 @@ export default function Home() {
       if (stepTimeoutRef.current) window.clearTimeout(stepTimeoutRef.current);
       if (popupTimeoutRef.current) window.clearTimeout(popupTimeoutRef.current);
       if (rickrollTimeoutRef.current) window.clearTimeout(rickrollTimeoutRef.current);
+      if (rickrollImageTimeoutRef.current) window.clearTimeout(rickrollImageTimeoutRef.current);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = "";
@@ -474,11 +483,15 @@ export default function Home() {
     if (rickrollTimeoutRef.current) window.clearTimeout(rickrollTimeoutRef.current);
     setPopupValue(null);
     setRickrollVisible(false);
+    setRickrollImageVisible(false);
     setCheatEnabled(false);
     seenMergesRef.current = new Set();
     if (rickrollAudioRef.current) {
       rickrollAudioRef.current.pause();
       rickrollAudioRef.current.currentTime = 0;
+    }
+    if (rickrollImageTimeoutRef.current) {
+      window.clearTimeout(rickrollImageTimeoutRef.current);
     }
     if (soundEnabled) {
       if (!audioRef.current) {
@@ -593,7 +606,7 @@ export default function Home() {
           <div className="rickroll-inner">
             {isTouchDevice ? (
               <div className="rickroll-mobile">
-                <img src="/rick-astley.png" alt="Rick Astley" />
+                {rickrollImageVisible && <img src="/rick-astley.png" alt="Rick Astley" />}
                 {!soundEnabled && (
                   <div className="rickroll-start">
                     <p>Enable sound to play</p>
@@ -623,6 +636,10 @@ export default function Home() {
               type="button"
               onClick={() => {
                 setRickrollVisible(false);
+                setRickrollImageVisible(false);
+                if (rickrollImageTimeoutRef.current) {
+                  window.clearTimeout(rickrollImageTimeoutRef.current);
+                }
                 if (rickrollAudioRef.current) {
                   rickrollAudioRef.current.pause();
                   rickrollAudioRef.current.currentTime = 0;
